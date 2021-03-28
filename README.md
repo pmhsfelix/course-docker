@@ -1,6 +1,30 @@
 # A docker course
 
+## Introduction
+
+Containers are a technology to create and run reproducible and isolated computing environments, similar in intent to virtual machines.
+
+They are based around the following main concepts:
+- **Containers** are isolated groups of runtime _things_, such as processes, disks, or network interfaces.
+They use operating system isolation mechanisms, such as Linux's [control groups](https://en.wikipedia.org/wiki/Cgroups), allowing multiple containers running over the same operating system kernel.
+- **Images** are is a reproducible way of defining containers. 
+The same way that processes are created from executable image files, containers are created from container images.
+- Mechanisms to create images, of which _dockerfiles_ are probably the best known example.
+
+In this course, we will start by using [Docker](https://docs.docker.com/) as an implementation of these concepts.
+The [docker architecture](https://docs.docker.com/get-started/overview/#docker-architecture) is composed by the following components:
+- The _Docker daemon_, which is a [daemon-like](https://en.wikipedia.org/wiki/Daemon_(computing)) program running on a docker host machine. It will be responsible for creating and managing images and containers on that docker host machine  
+- The `docker` command line interface (CLI) tools, that provides a way to interact with a local or remote docker daemon. 
+Namely, it is possible to use the `docker` CLI on a Windows or macOS machine to interact with a docker daemon running on a linux VM.
+- The _Docker registry_, which are remote repositories used to hold commonly used images.
+
+### Additional resources
+
+- [Quick reference guide](ref-guide.md)
+
 ## Creating a container from an existing image
+
+In this section we start our container journey by showing how to create them from already existing images.
 
 Start by checking the existing containers using the [`ps`](https://docs.docker.com/engine/reference/commandline/ps/) command.
 
@@ -28,13 +52,13 @@ CONTAINER ID        IMAGE               COMMAND             CREATED             
 c88e73b5e2a3        ubuntu              "/bin/bash"         7 seconds ago       Up 5 seconds                            container-ubuntu-1
 ```
 
-Run something inside the container using the [`exec`](https://docs.docker.com/engine/reference/commandline/exec/) command.
+Run a command inside the container using the [`exec`](https://docs.docker.com/engine/reference/commandline/exec/) command.
 
 ```
 docker exec -ti container-ubuntu-1 bash
 ```
 
-This runs `bash` inside the container and provides an interactive terminal to it
+This runs the `bash` command inside the container and provides an interactive terminal to it
 Running some commands on that terminal (e.g.  `whoami`, `pwd`, `cat /etc/os-release`, `ps -aux`) produces the following:
 
 ```
@@ -62,15 +86,14 @@ root        15  0.0  0.1   4108  3620 pts/1    Ss   13:23   0:00 bash
 root        25  0.0  0.1   5896  2892 pts/1    R+   13:28   0:00 ps -aux
 ```
 
-That is:
-- `root` on `/`.
+That is, the `bash` process is running in an isolated environment, i.e. a container, with the following characteristics.
+- User `root` on the  `/` folder.
 - On an Ubuntu distribution.
-- With tree processes running:
-  - The `ps` process that is listing the processes.
+- With two processes running:
   - The `bash` process that we executed in the container (see `exec` command).
-  - The `/bin/bash` process that was created when the container started and that is PID equal to 1.
+  - The `/bin/bash` process that was created when the container started and that has PID equal to 1.
 
-After exiting the terminal session back to the host, we can stop and remove the container.
+After exiting the terminal session back to the host, we can stop the container.
 
 ```
 root@c88e73b5e2a3:/# exit
@@ -104,7 +127,7 @@ CONTAINER ID        IMAGE               COMMAND             CREATED             
 
 ## Creating an image
 
-The previous example showed how to use an existing image to create containers.
+The previous section showed how to use an existing image to create containers.
 In this section we will show how to create new images.
 
 Let's start by listing all local images
@@ -114,7 +137,7 @@ Let's start by listing all local images
 REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
 ```
 
-Create a folder (e.g. src/example-0) and add the following folders to it.
+Create a folder (e.g. `src/example-0`) and add the following files to it.
 
 `script.sh` is a bash script with commands to show characteristics of the container environment.
 
@@ -130,7 +153,7 @@ cat ./file.txt
 echo $evar1
 ```
 
-`Dockerfile` is defined as a sequence of instructions defining the produced image.
+`Dockerfile` contains a sequence of instructions, defining the produced image.
 
 ```
 # Instruction to define the base image from where to start.
@@ -142,7 +165,7 @@ COPY script.sh .
 # Instruction to create a layer with the script.sh permissions changed.
 RUN chmod +x script.sh
 
-# Instruction to create a layer by running echo ...
+# Instruction to create a layer by running `echo ...`
 RUN echo "Hello docker" > file.txt
 
 # Instruction to define the default command to be run when a container is created from the image
@@ -196,7 +219,7 @@ ubuntu              latest              8e428cff54c8        42 hours ago        
 ```
 This listing include both the `ubuntu` base image, that was fetched during the build process, as well as the newly created `image-example-0` image.
 
-We can now run a container with this created image
+We can now run a container using this newly created image
 
 ```
 ➜  course-docker git:(main) ✗ docker run -t --name container-example-0 image-example-0
@@ -278,7 +301,7 @@ RUN echo "Hello docker" > file.txt
 
 Each instruction runs a command that creates an additional layer with the file system changes.
 
-This layering actually happens at the image level: an image is actually defines by a sequence of images, each corresponding to the result of the execution on top of the _parent_ image.
+This layering actually happens at the image level: an image is actually defined by a sequence of images, each corresponding to the result of the execution on top of the _parent_ image.
 This is visible in the following command
 ```
 ➜  course-docker git:(main) ✗ docker image history f98090c79a62   
@@ -310,14 +333,14 @@ The `image-example-0` is defined by a chain of 9 images, composed by:
 - The chain of 5 images that define the `ubuntu` image.
 - The additional chain of four images, that we created by the steps defined by the `Dockerfile`.
 
-This chain implemented via a `Parent` property, present in the image metadata.
+This chain is implemented via a `Parent` property, present in the image metadata.
 For instance, getting the parent for `image-example-0`
 ```
 ➜  course-docker git:(main) ✗ docker image inspect image-example-0 | grep Parent    
         "Parent": "sha256:f98090c79a6294eaa56f4bd53669a923d8d6816c99d0dc9993172defde6c32bd",
 ```
-we the ID of the second last image.
-Getting the parent of this image produces the third last image ID
+shows the ID for the second to last image.
+Getting the parent of this image produces the third to last image ID
 
 ```
 course-docker git:(main) ✗ docker image inspect f98090 | grep Parent
@@ -326,7 +349,7 @@ course-docker git:(main) ✗ docker image inspect f98090 | grep Parent
 
 ## Creating an image with a Node.js server
 
-The server source file.
+We start by creating the file with the server source code, in a new folder (e.g. ``src/example-0`). 
 
 ```
 const http = require('http');
@@ -344,9 +367,9 @@ server.listen(port, host, () => {
   console.log(`Server running at ${host}:${port}`);
 });
 ```
-Note that the server is listening on `0.0.0.0` and not on the loopback interface only.
+Note that the server is listening on `0.0.0.0` and not only on the loopback interface.
 
-The `Dockerfile`.
+We now create the `Dockerfile`.
 
 ```
 # Start from the alpine base image.
@@ -369,7 +392,7 @@ EXPOSE 8080
 CMD [ "node", "index.js" ]
 ```
 
-Building the image.
+To build the image we use the `docker build` command.
 
 ```
 ➜  course-docker git:(main) ✗ docker build -t image-example-1 src/example-1                        
@@ -407,7 +430,39 @@ Server running at 0.0.0.0:8080
 Hello World%                              
 ```
 
-The command `docker logs container-example-1` provides visibility on output of `node index.js`.
+The command `docker logs container-example-1` provides visibility on the output of the `node index.js`.
 
 The command `curl http://localhost:8000` performs a request to the server running inside the container. 
 Notice that the port in the request URI is the host port.
+
+We are not limited to only creating a single container from an image.
+In the following example we create two containers from the same image, using distinct port mappings
+
+```
+➜  course-docker git:(main) ✗ docker run -d --name container-example-1-0 -p 8000:8080 image-example-1 && docker run -d --name container-example-1-1 -p 8001:8080 image-example-1
+58272a54aa466c688cd24d179cfcfb09876159457ad4ec138a33cfec5c40dd84
+f067a86d14b9b2369c5ca24e8952f29d06040794f93ddcad8d0a3a6690a2f827
+➜  course-docker git:(main) ✗ curl -i http://localhost:8000
+HTTP/1.1 200 OK
+Content-Type: text/plain
+Date: Sun, 28 Mar 2021 16:50:59 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Content-Length: 11
+
+HelloWorld%                 
+➜  course-docker git:(main) ✗ curl -i http://localhost:8001
+HTTP/1.1 200 OK
+Content-Type: text/plain
+Date: Sun, 28 Mar 2021 16:51:08 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Content-Length: 11
+
+Hello World%
+```
+
+Notice how both containers have `node` processes listening on the same `8080` port, despite being ran on the same host.
+This is made possible by the virtualization and isolation techniques used by containers.
+Notice also that those ports are mapped into distinct ports outside of the containers.
+ 
